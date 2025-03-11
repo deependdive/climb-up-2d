@@ -1,0 +1,943 @@
+/*Feature 1: Fix avatar selection mandatory check - DONE
+Feature 2: Platform width to be dynamic - DONE
+Feature 3: Add coin collection
+Feature 4: Add support for pausing game until enter is pressed after level is passed - DONE
+Feature 5: Correct score counting towards platforms climbed so level can be passed - DONE
+Feature 6: Add a game over screen - DONE
+
+Bug 1: Blinking interval of game over restart text*/
+
+/*Resources
+Image hosting: Imgbb
+*/
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Climb Up! 2D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Honk&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Honk&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <style>
+        #gameTitle {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 120px;
+            background: linear-gradient(0deg, #FF1D1D,  #0EAB25);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: top;
+            margin: 0 0 0 0;
+            -webkit-text-stroke-width: 2px;
+            -webkit-text-stroke-color: white;
+        }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: black; /* Sky blue background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Press Start 2P', cursive; /* Use the selected font */
+        }
+        .game-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100vh;
+        }
+        canvas { 
+            border: 2px solid #333;
+            max-width: 70vw; /* Reduced from 100vw to center the game */
+            max-height: 100vh;
+            object-fit: contain;
+            position: relative;
+            z-index: 1;
+        }
+        #startScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            z-index: 1000;
+            padding: -20px; /* Reduced top padding */
+        }
+        #gameTitle {
+            position: relative; /* Set relative positioning for the title */
+            z-index: 1; /* Ensure the title is above the SVG */
+        }
+        .avatar-selection {
+            display: flex;
+            gap: 40px;
+            margin: 36px 0 0 12px;
+        }
+        .avatar-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 144px; /* Adjust width as needed */
+            height: 144px; /* Adjust height as needed */
+            border-radius: 16px;
+            border: 2px solid transparent;
+            background: rgba(255, 255, 255, 0.1);
+            transition: background 0.3s;
+            padding: 10px;
+        }
+        .avatar-container.selected {
+            border-color: #4CAF50; /* Green border for selected avatar */
+            background: rgba(76, 175, 80, 0.3); /* Light green background for selected */
+        }
+        .avatar-preview {
+            width: 132px !important;
+            height: 132px !important;
+        }
+        #playerName {
+            padding: 12px;
+            font-size: 36px; /* Updated font size */
+            margin: 20px 0;
+            border-radius: 12px;
+            border: none;
+            width: 600px; /* Increased width to fit a name of 50 characters */
+            background-color: black;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+        }
+        .start-text {
+            font-size: 24px;
+            color: #26FA47;
+            margin-top: 36px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        #score {
+            position: fixed;
+            top: 60px;
+            left: 20px; /* Adjusted to be on the left side */
+            color: white;
+            font-size: 24px;
+            font-family: 'Press Start 2P', cursive;
+            z-index: 2;
+        }
+        #playerInfo {
+            position: fixed;
+            top: 60px;
+            right: 20px; /* Added to be on the right side */
+            color: white;
+            font-size: 24px;
+            font-family: 'Press Start 2P', cursive;
+            text-align: right;
+            z-index: 2;
+        }
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            z-index: 1000;
+        }
+        
+        #gameOverTitle {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 120px;
+            background: linear-gradient(0deg, #FF1D1D, #0EAB25);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: top;
+            margin: 0 0 40px 0;
+            -webkit-text-stroke-width: 2px;
+            -webkit-text-stroke-color: white;
+        }
+        
+        .player-stats {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+        }
+        
+        .avatar-display {
+            margin-right: 20px;
+        }
+        
+        .player-info {
+            font-size: 24px;
+            color: white;
+        }
+        
+        .credit-text {
+            position: absolute;
+            bottom: 36px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 18px;
+            font-family: 'Press Start 2P', cursive;
+            z-index: 1001;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div id="startScreen">
+            <a href="https://imgbb.com/"><img src="https://i.ibb.co/kj8GQhw/climbup-icon.png" alt="climbup-icon" border="0" width="355" height="355"></a>
+            <h1 id="gameTitle">Climb Up!</h1>
+            <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+            <div class="avatar-selection">
+                <div class="avatar-container" data-avatar="blue">
+                    <canvas class="avatar-preview" width="72" height="72"></canvas>
+                </div>
+                <div class="avatar-container" data-avatar="pink">
+                    <canvas class="avatar-preview" width="72" height="72"></canvas>
+                </div>
+            </div>
+            <p style="padding: 12px 0 0 0; font-size: 18px;">Pick your climber</p>
+            <p style="padding: 36px 0 0 0;font-size: 24px;">Use arrow keys to move and spacebar to jump</p>
+            <p id="startText" class="start-text">Press SPACE to start!</p>
+            <p class="credit-text">Made with ❤️ by Deepanshu Arora</p>
+        </div>
+        
+        <div id="gameOverScreen" style="display: none;">
+            <h1 id="gameOverTitle">Game Over!</h1>
+            <div class="player-stats">
+                <div class="avatar-display">
+                    <canvas id="gameOverAvatar" width="132" height="132"></canvas>
+                </div>
+                <div class="player-info">
+                    <p id="finalPlayerName"></p>
+                    <p id="finalScore"></p>
+                </div>
+            </div>
+            <p id="restartText" class="start-text">Press SPACE to restart!</p>
+            <p style="padding: 36px 0 0 0;font-size: 24px;">Press ENTER to return to main menu</p>
+            <p class="credit-text">Made with ❤️ by Deepanshu Arora</p>
+        </div>
+        
+        <canvas id="gameCanvas"></canvas>
+        <div id="score">
+            <p style="font-size: 36px; color: green;">Height: <span style="font-size: 24px; color: green;">0</span>m</p>
+            <p style="font-size: 24px; color: rgb(245, 41, 235);">Level: <span style="font-size: 24px; color: rgb(245, 23, 245);">1</span></p>
+            <p style="font-size: 24px; color: white;">Platforms: <span style="font-size: 24px; color: white;">0</span>/20</p>
+        </div>
+        <div id="playerInfo">
+            <p id="displayPlayerName"></p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas size
+        canvas.width = 2400;  // 800 * 3
+        canvas.height = 1800; // 600 * 3
+
+        // Game constants
+        const GRAVITY = 0.5 * 3;
+        const JUMP_FORCE = -12 * 3;
+        const PLAYER_SIZE = 30 * 3;
+        function getRandomPlatformWidth() {
+            return Math.random() * (500 - 100) + 100; // Random width between 100 and 500
+        }
+        const PLATFORM_HEIGHT = 20 * 3;
+        const FLOOR_HEIGHT = 40;  // Height of the concrete floor
+        const FLOOR_EXTRA_WIDTH = 400;  // How much wider the floor is than regular platforms
+
+        // Game state
+        let gameStarted = false;
+        let player = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            vx: 0,
+            vy: 0,
+            width: 96,
+            height: 96,
+            sprite: null,
+            facingLeft: false,
+            jumpsLeft: 2,  // Track available jumps
+            onGround: false
+        };
+        let platforms = [];
+        let score = 0;
+        let selectedAvatar = null;
+        let playerName = '';
+
+        // Add camera offset tracking
+        let cameraOffset = {
+            y: 0
+        };
+
+        // Add level tracking
+        let currentLevel = 1;
+        let platformsClimbed = 0;
+        const PLATFORMS_PER_LEVEL = 20;
+
+        // Add platform ID counter
+        let platformIdCounter = 0;
+
+        // Add this variable at the top with other game variables
+        let baseHeight = 0; // This will track the height of the first platform
+
+        // Add this variable near the top with other game state variables
+        let isPaused = false;
+
+        // Add this variable near the top with other game state variables
+        let highestPlatformReached = 0;
+
+        // Update game background and add brick texture
+        function createBrickPattern() {
+            const patternCanvas = document.createElement('canvas');
+            const patternContext = patternCanvas.getContext('2d');
+            patternCanvas.width = 32;
+            patternCanvas.height = 16;
+
+            // Brick color (Mario-style red bricks)
+            patternContext.fillStyle = '#c84c0c';  // Base brick color
+            patternContext.fillRect(0, 0, 32, 16);
+
+            // Add brick details
+            patternContext.fillStyle = '#a13a0c';  // Darker shade for details
+            patternContext.fillRect(0, 13, 32, 3); // Bottom shadow
+            patternContext.fillRect(16, 0, 2, 16); // Vertical line
+
+            return ctx.createPattern(patternCanvas, 'repeat');
+        }
+
+        // Update platform management and scrolling
+        function managePlatforms() {
+            const playerZone = Math.floor(player.y / 300);
+            const minY = player.y - (10 * 300);
+            const maxY = player.y + (10 * 300);
+
+            // Keep floor and filter other platforms
+            platforms = platforms.filter(platform => 
+                platform.isFloor || (platform.y > minY && platform.y < maxY)
+            );
+
+            // Sort platforms by height (lowest to highest)
+            platforms.sort((a, b) => b.y - a.y);
+
+            // If this is the first platform generation, set the base height
+            if (baseHeight === 0 && platforms.length > 0) {
+                baseHeight = platforms[0].y;
+            }
+
+            // Generate new platforms if needed
+            while (platforms.length < 20) {
+                let newY;
+                if (platforms.length === 0) {
+                    newY = player.y;
+                    baseHeight = newY;
+                } else {
+                    const highestPlatform = platforms.reduce((prev, current) => 
+                        prev.y < current.y ? prev : current
+                    );
+                    newY = highestPlatform.y - 300;
+                }
+
+                platforms.push({
+                    x: Math.random() * (canvas.width - getRandomPlatformWidth()),
+                    y: newY,
+                    width: getRandomPlatformWidth(),
+                    height: PLATFORM_HEIGHT,
+                    color: '#c84c0c',
+                    visited: false,
+                    isFloor: false
+                });
+            }
+
+            // Update platform numbers based on their height relative to base
+            platforms.forEach(platform => {
+                platform.number = Math.floor((baseHeight - platform.y) / 300);
+            });
+        }
+
+        // Draw functions
+        function drawPlayer() {
+            if (!player.sprite) {
+                player.sprite = createTurtleSprite();
+            }
+
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            // Optional: Add jump effect
+            if (!player.onGround) {
+                // Add slight rotation or scale effect during jumps
+                const jumpScale = 1 + (Math.abs(player.vy) * 0.02);
+                ctx.scale(1, jumpScale);
+            }
+            
+            if (player.facingLeft) {
+                ctx.scale(-1, 1);
+                ctx.drawImage(player.sprite, -player.width, 0, player.width, player.height);
+            } else {
+                ctx.drawImage(player.sprite, 0, 0, player.width, player.height);
+            }
+            
+            // Optional: Draw jump indicators
+            // if (player.jumpsLeft > 0 && !player.onGround) {
+            //     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            //     ctx.beginPath();
+            //     ctx.arc(0, player.height/2, 10, 0, Math.PI * 2);
+            //     ctx.fill();
+            // }
+            
+            ctx.restore();
+        }
+
+        function drawPlatforms() {
+            platforms.forEach(platform => {
+                ctx.fillStyle = platform.color;
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                
+                // Draw platform edges
+                ctx.strokeStyle = '#606060';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+            });
+        }
+
+        // Update draw function
+        function draw() {
+            // Clear canvas with black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Create brick pattern
+            const brickPattern = createBrickPattern();
+            
+            // Update camera to follow player
+            const targetCameraY = -(player.y - canvas.height * 0.6);
+            cameraOffset.y += (targetCameraY - cameraOffset.y) * 0.1;
+
+            ctx.save();
+            ctx.translate(0, cameraOffset.y);
+            
+            // Draw platforms
+            platforms.forEach(platform => {
+                if (platform.y + cameraOffset.y > -PLATFORM_HEIGHT && 
+                    platform.y + cameraOffset.y < canvas.height) {
+                    
+                    if (platform.isFloor) {
+                        // Draw concrete floor with gradient and texture
+                        const gradient = ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + platform.height
+                        );
+                        gradient.addColorStop(0, '#a0a0a0');
+                        gradient.addColorStop(1, '#686868');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                        
+                        // Add concrete texture
+                        ctx.fillStyle = '#7a7a7a';
+                        for (let i = 0; i < platform.width; i += 20) {
+                            for (let j = 0; j < platform.height; j += 20) {
+                                if ((i + j) % 40 === 0) {
+                                    ctx.fillRect(
+                                        platform.x + i, platform.y + j,
+                                        10, 10
+                                    );
+                                }
+                            }
+                        }
+                        
+                        // Add platform border
+                        ctx.strokeStyle = '#505050';
+                        ctx.lineWidth = 4;
+                        ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                        
+                        // Add subtle shadow at the top
+                        const shadowGradient = ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + 10
+                        );
+                        shadowGradient.addColorStop(0, 'rgba(0,0,0,0.3)');
+                        shadowGradient.addColorStop(1, 'rgba(0,0,0,0)');
+                        ctx.fillStyle = shadowGradient;
+                        ctx.fillRect(platform.x, platform.y, platform.width, 10);
+                    } else {
+                        // Regular platform drawing (brick pattern)
+                        ctx.fillStyle = brickPattern;
+                        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                        
+                        ctx.strokeStyle = '#8b0000';
+                        ctx.lineWidth = 4;
+                        ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                    }
+                    
+                    // Draw platform number (only for non-floor platforms)
+                    if (!platform.isFloor) {
+                        ctx.fillStyle = 'white';
+                        ctx.font = 'bold 30px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.strokeStyle = 'black';
+                        ctx.lineWidth = 3;
+                        
+                        const displayNumber = Math.max(0, platform.number);
+                        ctx.strokeText(displayNumber,
+                            platform.x + platform.width / 2,
+                            platform.y + platform.height / 2 + 10);
+                        ctx.fillText(displayNumber,
+                            platform.x + platform.width / 2,
+                            platform.y + platform.height / 2 + 10);
+                    }
+                }
+            });
+
+            drawPlayer();
+            
+            ctx.restore();
+
+            drawUI();
+        }
+
+        // Update platform generation in the update function
+        function update() {
+            if (!gameStarted || isPaused) return;
+
+            // Movement controls
+            if (keys['ArrowLeft'] || keys['Left']) {
+                player.x -= 15;
+                player.facingLeft = true;
+            }
+            if (keys['ArrowRight'] || keys['Right']) {
+                player.x += 15;
+                player.facingLeft = false;
+            }
+
+            // Apply gravity
+            player.vy += GRAVITY;
+            player.y += player.vy;
+
+            // Manage platforms
+            managePlatforms();
+
+            // Platform collision
+            let isOnPlatform = false;
+            let currentPlatformNumber = 0;
+            
+            platforms.forEach(platform => {
+                if (checkPlatformCollision(platform)) {
+                    if (player.vy > 0) {
+                        player.y = platform.y - player.height;
+                        player.vy = 0;
+                        player.onGround = true;
+                        player.jumpsLeft = 2;
+                        isOnPlatform = true;
+                        
+                        // Update current platform number when landing on a platform
+                        currentPlatformNumber = Math.max(currentPlatformNumber, platform.number);
+                        
+                        // Mark platform as visited (for visual feedback if needed)
+                        platform.visited = true;
+                    }
+                }
+            });
+            
+            // Update highest platform reached and platforms climbed
+            if (currentPlatformNumber > highestPlatformReached) {
+                // Calculate how many new platforms were crossed
+                const newPlatformsCrossed = currentPlatformNumber - highestPlatformReached;
+                
+                // Update platforms climbed count
+                platformsClimbed += newPlatformsCrossed;
+                
+                // Update highest platform reached
+                highestPlatformReached = currentPlatformNumber;
+            }
+
+            // Update ground state
+            if (!isOnPlatform && player.onGround) {
+                player.onGround = false;
+            }
+
+            // Game over check - adjust for new platform management
+            const lowestPlatform = platforms.reduce((prev, current) => 
+                prev.y > current.y ? prev : current
+            );
+            
+            if (player.y > lowestPlatform.y + 500) {
+                gameStarted = false;
+                showGameOverScreen();
+            }
+
+            // Screen boundaries (wrap-around logic)
+            if (player.x + player.width < 0) {
+                player.x = canvas.width;
+            } else if (player.x > canvas.width) {
+                player.x = -player.width;
+            }
+
+            // Update score
+            score = Math.max(score, Math.floor((canvas.height - player.y) / 30)); // Adjusted for new scale
+            updateScoreDisplay();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Input handling
+        const keys = {};
+        document.addEventListener('keydown', function(e) {
+            keys[e.code] = true;
+            
+            // Check if game over screen is visible
+            const gameOverScreen = document.getElementById('gameOverScreen');
+            if (gameOverScreen.style.display === 'flex') {
+                if (e.code === 'Space') {
+                    // Restart the game with the same player
+                    gameOverScreen.style.display = 'none';
+                    document.getElementById('score').style.display = 'block';
+                    document.getElementById('playerInfo').style.display = 'block';
+                    gameStarted = true;
+                    resetGame();
+                    return;
+                } else if (e.code === 'Enter') {
+                    // Return to the start screen
+                    gameOverScreen.style.display = 'none';
+                    document.getElementById('startScreen').style.display = 'flex';
+                    document.getElementById('score').style.display = 'block';
+                    document.getElementById('playerInfo').style.display = 'block';
+                    selectedAvatar = null; // Reset avatar selection
+                    return;
+                }
+            }
+            
+            // Handle game start
+            if (e.code === 'Space' && !gameStarted) {
+                startGame();
+                return;
+            }
+            
+            // If game is paused, only respond to Enter key
+            if (isPaused) {
+                if (e.code === 'Enter' && checkLevelCompletion()) {
+                    isPaused = false;
+                    startNextLevel();
+                }
+                return; // Ignore all other keys when paused
+            }
+            
+            // Handle jumping (only when not paused)
+            if (e.code === 'Space' && gameStarted) {
+                if (player.onGround) {
+                    // First jump
+                    player.vy = JUMP_FORCE;
+                    player.onGround = false;
+                    player.jumpsLeft = 1; // One jump remaining
+                } else if (player.jumpsLeft > 0) {
+                    // Double jump
+                    player.vy = JUMP_FORCE * 0.8; // Slightly weaker second jump
+                    player.jumpsLeft = 0;
+                }
+            }
+        });
+
+        document.addEventListener('keyup', function(e) {
+            keys[e.code] = false;
+        });
+
+        // Game controls
+        function updateControls() {
+            if (keys['ArrowLeft'] || keys['Left']) player.vx = -5;
+            else if (keys['ArrowRight'] || keys['Right']) player.vx = 5;
+            else player.vx = 0;
+        }
+
+        // Initialize game
+        function startGame() {
+            playerName = document.getElementById('playerName').value.trim();
+            console.log('Player Name:', playerName);
+            console.log('Selected Avatar:', selectedAvatar);
+            
+            if (!playerName && !selectedAvatar) {
+                alert('Please enter your name and select an avatar!');
+                return;
+            }
+            else if (!playerName) {
+                alert('Please enter your name!');
+                return;
+            }
+            else if (!selectedAvatar) {
+                alert('Please select an avatar!');
+                return;
+            }
+            
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('displayPlayerName').textContent = playerName;
+            gameStarted = true;
+            resetGame();
+        }
+
+        function resetGame() {
+            baseHeight = 0;
+            platforms = [];
+            
+            // Create the concrete floor platform first
+            const floorPlatform = {
+                x: (canvas.width - (getRandomPlatformWidth() + FLOOR_EXTRA_WIDTH)) / 2, // Centered, wider platform
+                y: canvas.height - FLOOR_HEIGHT,
+                width: getRandomPlatformWidth() + FLOOR_EXTRA_WIDTH,
+                height: FLOOR_HEIGHT,
+                isFloor: true, // Special flag for the floor
+                color: '#808080', // Concrete gray color
+                number: 0,
+                visited: false
+            };
+            platforms.push(floorPlatform);
+            
+            // Create regular platforms starting higher up
+            for (let i = 1; i < 20; i++) {
+                const platformY = canvas.height - FLOOR_HEIGHT - (i * 300);
+                platforms.push({
+                    x: Math.random() * (canvas.width - getRandomPlatformWidth()),
+                    y: platformY,
+                    width: getRandomPlatformWidth(),
+                    height: PLATFORM_HEIGHT,
+                    color: '#c84c0c',
+                    number: i,
+                    visited: false,
+                    isFloor: false
+                });
+            }
+
+            // Set base height to the floor platform
+            baseHeight = floorPlatform.y;
+
+            // Position player on the floor platform
+            player.x = canvas.width / 2;
+            player.y = floorPlatform.y - player.height;
+            player.vx = 0;
+            player.vy = 0;
+            player.jumpsLeft = 2;
+            player.onGround = true;
+            
+            score = 0;
+            platformsClimbed = 0;
+            highestPlatformReached = 0; // Reset the highest platform reached
+            cameraOffset.y = 0;
+        }
+
+        // Avatar selection
+        document.querySelectorAll('.avatar-container').forEach(option => {
+            option.addEventListener('click', () => {
+                document.querySelectorAll('.avatar-container').forEach(opt => 
+                    opt.classList.remove('selected'));
+                option.classList.add('selected');
+                selectedAvatar = option.dataset.avatar;
+                player.sprite = createTurtleSprite(selectedAvatar);
+            });
+        });
+
+        // Initialize preview canvases
+        document.querySelectorAll('.avatar-container').forEach(option => {
+            const canvas = option.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+            const sprite = createTurtleSprite(option.dataset.avatar);
+            ctx.drawImage(sprite, 0, 0);
+        });
+
+        // Start game loop
+        gameLoop();
+        
+        // Set initial platform
+        managePlatforms();
+
+        // Add this after your canvas setup
+        function createTurtleSprite(avatarColor) {
+            const spriteCanvas = document.createElement('canvas');
+            const spriteCtx = spriteCanvas.getContext('2d');
+            spriteCanvas.width = 96;  // 32 * 3
+            spriteCanvas.height = 96; // 32 * 3
+
+            // Colors based on the avatar color
+            const shell = avatarColor === 'blue' ? '#3498db' : '#e91e63'; // Blue or Pink shell
+            const skin = '#82e0aa';   // Lighter green for skin
+            const mask = avatarColor === 'blue' ? '#3498db' : '#e91e63';  // Blue or Pink mask
+
+            // Draw the turtle pixel by pixel (scaled up 3x)
+            const pixels = [
+                // Shell pattern (darker green)
+                [12,6, 36,36, shell], // Shell outline
+                [15,9, 30,30, '#27ae60'], // Inner shell
+                
+                // Body (lighter green)
+                [18,39, 12,9, skin],  // Lower body
+                [9,18, 9,12, skin],   // Left arm
+                [30,18, 9,12, skin],  // Right arm
+                
+                // Mask (blue or pink)
+                [12,12, 24,6, mask],   // Mask strip
+                
+                // Eyes (white with black pupils)
+                [15,12, 6,6, 'white'],
+                [27,12, 6,6, 'white'],
+                [18,15, 3,3, 'black'],
+                [30,15, 3,3, 'black'],
+            ];
+
+            // Draw each pixel section
+            pixels.forEach(([x, y, w, h, color]) => {
+                spriteCtx.fillStyle = color;
+                spriteCtx.fillRect(x, y, w, h);
+            });
+
+            return spriteCanvas;
+        }
+
+        function checkPlatformCollision(platform) {
+            return player.y + player.height > platform.y &&
+                   player.y < platform.y + platform.height &&
+                   player.x + player.width > platform.x &&
+                   player.x < platform.x + platform.width;
+        }
+
+        // Add level completion check
+        function checkLevelCompletion() {
+            if (platformsClimbed >= PLATFORMS_PER_LEVEL) {
+                isPaused = true; // Pause the game when level is completed
+                return true;
+            }
+            return false;
+        }
+
+        // Add next level function
+        function startNextLevel() {
+            currentLevel++;
+            platformsClimbed = 0;
+            // Increase difficulty with each level
+            GRAVITY *= 1.1;
+            JUMP_FORCE *= 1.1;
+            // Reset player position but keep height progress
+            const currentHeight = player.y;
+            resetGame();
+            player.y = currentHeight;
+        }
+
+        // Update UI colors for better visibility on black background
+        function drawUI() {
+            // Draw score with shadow for better visibility
+            ctx.fillStyle = 'white';
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            
+            // Reset shadow
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            // Level completion message
+            if (checkLevelCompletion()) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, canvas.height/2 - 100, canvas.width, 200);
+                
+                ctx.fillStyle = '#4CAF50';
+                ctx.font = '72px "Press Start 2P", cursive';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Level ${currentLevel} Complete!`, canvas.width/2, canvas.height/2);
+                ctx.font = '36px "Press Start 2P", cursive';
+                ctx.fillText('Press ENTER to start next level', canvas.width/2, canvas.height/2 + 60);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // Optional: Add Mario-style platform break effect when landing
+        function createPlatformParticles(x, y) {
+            // Add simple particle effect when landing
+            const particles = [];
+            for (let i = 0; i < 5; i++) {
+                particles.push({
+                    x: x + Math.random() * getRandomPlatformWidth(),
+                    y: y,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: -Math.random() * 5,
+                    size: 5,
+                    life: 1
+                });
+            }
+            return particles;
+        }
+
+        // Function to make the text blink
+        function startBlinkingText() {
+            const startText = document.getElementById('startText');
+            setInterval(() => {
+                startText.style.opacity = startText.style.opacity === '0' ? '1' : '0'; // Toggle opacity
+            }, 600); // 600 milliseconds
+        }
+        // Call the function to start blinking when the game starts
+        startBlinkingText();
+
+        // Add this function to show the game over screen
+        function showGameOverScreen() {
+            // Hide the game canvas and score display
+            document.getElementById('score').style.display = 'none';
+            document.getElementById('playerInfo').style.display = 'none';
+            
+            // Set the player name and score
+            document.getElementById('finalPlayerName').textContent = `Player: ${playerName}`;
+            document.getElementById('finalScore').textContent = `Final Height: ${score}m`;
+            
+            // Draw the player's avatar on the game over screen
+            const avatarCanvas = document.getElementById('gameOverAvatar');
+            const avatarCtx = avatarCanvas.getContext('2d');
+            const avatarSprite = createTurtleSprite(selectedAvatar);
+            avatarCtx.drawImage(avatarSprite, 0, 0, 132, 132);
+            
+            // Show the game over screen
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            
+            // Start the blinking text effect
+            startBlinkingGameOverText();
+        }
+
+        // Add this function to make the restart text blink
+        function startBlinkingGameOverText() {
+            const restartText = document.getElementById('restartText');
+            setInterval(() => {
+                restartText.style.opacity = restartText.style.opacity === '0' ? '1' : '0'; // Toggle opacity
+            }, 600); // 600 milliseconds
+        }
+
+        // Add a new function to update the score display
+        function updateScoreDisplay() {
+            const scoreElement = document.getElementById('score');
+            scoreElement.innerHTML = `
+            <p style="font-size: 36px; color: green;">Height: <span style="font-size: 36px; color: green;">${score}</span>m</p>
+            <p style="font-size: 24px; color: rgb(245, 41, 235);">Level: <span style="font-size: 24px; color: rgb(245, 23, 245);">${currentLevel}</span></p>
+            <p style="font-size: 24px; color: white;">Platforms: <span style="font-size: 24px; color: white;">${platformsClimbed}</span>/${PLATFORMS_PER_LEVEL}</p>
+            `;
+        }
+    </script>
+</body>
+</html>

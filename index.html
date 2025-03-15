@@ -197,6 +197,115 @@ Image hosting: Imgbb
             font-family: 'Press Start 2P', cursive;
             z-index: 1001;
         }
+        
+        /* Add these styles for mobile controls */
+        .mobile-controls {
+            display: none; /* Hidden by default, shown on mobile */
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            z-index: 100;
+        }
+        
+        .direction-controls {
+            position: absolute;
+            left: 20px;
+            bottom: 0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .jump-control {
+            position: absolute;
+            right: 20px;
+            bottom: 0;
+        }
+        
+        .control-button {
+            width: 70px;
+            height: 70px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border: 3px solid white;
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 36px;
+            color: white;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .jump-button {
+            width: 90px;
+            height: 90px;
+            border-radius: 45px;
+            background-color: rgba(76, 175, 80, 0.5);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: block;
+            }
+            
+            #gameCanvas {
+                max-width: 100vw;
+                max-height: 80vh;
+            }
+            
+            #startScreen, #gameOverScreen {
+                padding: 10px;
+            }
+            
+            #gameTitle {
+                font-size: 60px;
+            }
+            
+            #gameOverTitle {
+                font-size: 60px;
+            }
+            
+            .avatar-selection {
+                gap: 20px;
+            }
+            
+            .avatar-container {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .avatar-preview {
+                width: 90px !important;
+                height: 90px !important;
+            }
+            
+            #playerName {
+                width: 90%;
+                font-size: 24px;
+            }
+            
+            .start-text {
+                font-size: 18px;
+            }
+            
+            #score {
+                top: 10px;
+                left: 10px;
+                font-size: 16px;
+            }
+            
+            #playerInfo {
+                top: 10px;
+                right: 10px;
+                font-size: 16px;
+            }
+            
+            .credit-text {
+                font-size: 12px;
+                bottom: 100px; /* Move up to make room for controls */
+            }
+        }
     </style>
 </head>
 <body>
@@ -243,6 +352,16 @@ Image hosting: Imgbb
         </div>
         <div id="playerInfo">
             <p id="displayPlayerName"></p>
+        </div>
+        
+        <div class="mobile-controls">
+            <div class="direction-controls">
+                <div class="control-button" id="leftButton">←</div>
+                <div class="control-button" id="rightButton">→</div>
+            </div>
+            <div class="jump-control">
+                <div class="control-button jump-button" id="jumpButton">JUMP</div>
+            </div>
         </div>
     </div>
 
@@ -306,6 +425,154 @@ Image hosting: Imgbb
         // Add this variable near the top with other game state variables
         let highestPlatformReached = 0;
 
+        // Add these variables near the top with other game state variables
+        let coins = [];
+        let coinsCollected = 0;
+
+        // Add platform type constants
+        const PLATFORM_TYPES = {
+            NORMAL: 'normal',
+            ICE_SPIKE: 'ice_spike',
+            CLOUD: 'cloud',
+            MOVING: 'moving'
+        };
+
+        // Add platform type counters to track frequency
+        let platformTypeCounts = {
+            [PLATFORM_TYPES.ICE_SPIKE]: 0,
+            [PLATFORM_TYPES.CLOUD]: 0,
+            [PLATFORM_TYPES.MOVING]: 0
+        };
+
+        // Add this class for the coin object
+        class Coin {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 60;
+                this.height = 60;
+                this.rotation = 0;
+                this.scale = 2;
+                this.collected = false;
+                this.bounceHeight = 0;
+                this.bounceSpeed = 0;
+                this.twinkleOpacity = 1;
+                this.twinkleSize = 0;
+                this.collectionAnimation = false;
+            }
+
+            update() {
+                // Rotate the coin
+                this.rotation += 0.1;
+                
+                if (this.collectionAnimation) {
+                    // Bounce effect
+                    this.bounceHeight += this.bounceSpeed;
+                    this.bounceSpeed -= 0.5; // Gravity effect
+                    
+                    // Start twinkle effect when bounce is done
+                    if (this.bounceSpeed < -5) {
+                        this.twinkleOpacity -= 0.05;
+                        this.twinkleSize += 2;
+                    }
+                    
+                    // Remove coin when animation is complete
+                    if (this.twinkleOpacity <= 0) {
+                        this.collected = true;
+                    }
+                }
+            }
+
+            draw(ctx) {
+                if (this.collected) return;
+                
+                ctx.save();
+                
+                // Apply bounce offset if being collected
+                let yOffset = this.collectionAnimation ? -this.bounceHeight : 0;
+                
+                // Position and rotate the coin
+                ctx.translate(this.x + this.width/2, this.y + this.height/18 + yOffset);
+                ctx.rotate(this.rotation);
+                // ctx.scale(Math.abs(Math.cos(this.rotation * 0.5)) * 0.5 + 0.5, 1); // Y-axis rotation simulation
+                
+                // Draw the coin
+                if (this.collectionAnimation) {
+                    ctx.globalAlpha = this.twinkleOpacity;
+                }
+                
+                // Gold gradient for coin
+                const gradient = ctx.createRadialGradient(0, 0, 2, 0, 0, 24);
+                gradient.addColorStop(0, '#FFD700'); // Bright gold center
+                gradient.addColorStop(1, '#B8860B'); // Darker gold edge
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(0, 0, 24, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add coin details (dollar sign)
+                ctx.fillStyle = '#8B4513';
+                ctx.font = '4px Press Start 2P, cursive';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('₹', 0, 0);
+                
+                // Draw twinkle effect if being collected
+                if (this.collectionAnimation && this.bounceSpeed < -5) {
+                    ctx.globalAlpha = this.twinkleOpacity;
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    
+                    // Draw star shape
+                    for (let i = 0; i < 5; i++) {
+                        const angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+                        const x1 = Math.cos(angle) * this.twinkleSize;
+                        const y1 = Math.sin(angle) * this.twinkleSize;
+                        const x2 = Math.cos(angle + Math.PI/5) * (this.twinkleSize/2);
+                        const y2 = Math.sin(angle + Math.PI/5) * (this.twinkleSize/2);
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x1, y1);
+                        } else {
+                            ctx.lineTo(x1, y1);
+                        }
+                        ctx.lineTo(x2, y2);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+
+            collect() {
+                if (!this.collectionAnimation) {
+                    this.collectionAnimation = true;
+                    this.bounceSpeed = 10; // Initial upward velocity
+                    coinsCollected++;
+                    // Play sound effect if you have one
+                    // playSound('coin');
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // Add this function to place coins on random platforms
+        function placeCoinOnPlatform(platform) {
+            // Don't place coins on the floor
+            if (platform.isFloor) return;
+            
+            // 30% chance to place a coin on a platform
+            if (Math.random() < 0.6) {
+                // Place coin in a random position on the platform
+                const coinX = platform.x + Math.random() * (platform.width - 30);
+                const coinY = platform.y - 60; // Position above the platform
+                coins.push(new Coin(coinX, coinY));
+            }
+        }
+
         // Update game background and add brick texture
         function createBrickPattern() {
             const patternCanvas = document.createElement('canvas');
@@ -344,6 +611,19 @@ Image hosting: Imgbb
                 baseHeight = platforms[0].y;
             }
 
+            // Count existing platform types
+            platformTypeCounts = {
+                [PLATFORM_TYPES.ICE_SPIKE]: 0,
+                [PLATFORM_TYPES.CLOUD]: 0,
+                [PLATFORM_TYPES.MOVING]: 0
+            };
+            
+            platforms.forEach(platform => {
+                if (platform.type && platform.type !== PLATFORM_TYPES.NORMAL) {
+                    platformTypeCounts[platform.type]++;
+                }
+            });
+
             // Generate new platforms if needed
             while (platforms.length < 20) {
                 let newY;
@@ -357,20 +637,120 @@ Image hosting: Imgbb
                     newY = highestPlatform.y - 300;
                 }
 
-                platforms.push({
-                    x: Math.random() * (canvas.width - getRandomPlatformWidth()),
+                // Determine platform type
+                let platformType = PLATFORM_TYPES.NORMAL;
+                
+                // Only add special platforms if we're not at the beginning of the game
+                if (platforms.length > 5) {
+                    // Randomly select a special platform type with constraints
+                    const specialTypes = [
+                        { type: PLATFORM_TYPES.ICE_SPIKE, count: platformTypeCounts[PLATFORM_TYPES.ICE_SPIKE], maxCount: 1 },
+                        { type: PLATFORM_TYPES.CLOUD, count: platformTypeCounts[PLATFORM_TYPES.CLOUD], maxCount: 1 },
+                        { type: PLATFORM_TYPES.MOVING, count: platformTypeCounts[PLATFORM_TYPES.MOVING], maxCount: 1 }
+                    ];
+                    
+                    // Filter types that haven't reached their max count
+                    const availableTypes = specialTypes.filter(t => t.count < t.maxCount);
+                    
+                    // 30% chance to create a special platform if available
+                    if (availableTypes.length > 0 && Math.random() < 0.3) {
+                        // Randomly select one of the available special types
+                        const selectedType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+                        platformType = selectedType.type;
+                        platformTypeCounts[platformType]++;
+                    }
+                }
+
+                const platformWidth = getRandomPlatformWidth();
+                
+                // Create the new platform with appropriate properties
+                const newPlatform = {
+                    x: Math.random() * (canvas.width - platformWidth),
                     y: newY,
-                    width: getRandomPlatformWidth(),
+                    width: platformWidth,
                     height: PLATFORM_HEIGHT,
-                    color: '#c84c0c',
+                    color: getPlatformColor(platformType),
+                    type: platformType,
                     visited: false,
-                    isFloor: false
-                });
+                    isFloor: false,
+                    number: 0, // Will be updated later
+                    
+                    // Additional properties for special platforms
+                    originalX: 0, // For moving platforms
+                    movingDirection: 1, // For moving platforms (1: right, -1: left)
+                    moveSpeed: 2, // For moving platforms
+                    cloudOpacity: 1, // For cloud platforms
+                    cloudFading: false, // For cloud platforms
+                    spikeHeight: 30, // For ice spike platforms
+                    spikePosition: Math.random() < 0.5 ? 'left' : 'right' // Randomly place spike on left or right
+                };
+                
+                // Set original X position for moving platforms
+                newPlatform.originalX = newPlatform.x;
+                
+                platforms.push(newPlatform);
+                
+                // Place coins on the new platform (except on ice spike platforms)
+                if (platformType !== PLATFORM_TYPES.ICE_SPIKE) {
+                    placeCoinOnPlatform(newPlatform);
+                }
             }
 
             // Update platform numbers based on their height relative to base
             platforms.forEach(platform => {
                 platform.number = Math.floor((baseHeight - platform.y) / 300);
+            });
+            
+            // Update special platform behaviors
+            updateSpecialPlatforms();
+            
+            // Filter out collected coins
+            coins = coins.filter(coin => !coin.collected);
+            
+            // Remove coins that are too far away
+            coins = coins.filter(coin => coin.y > minY && coin.y < maxY);
+        }
+
+        // Function to get platform color based on type
+        function getPlatformColor(platformType) {
+            switch (platformType) {
+                case PLATFORM_TYPES.ICE_SPIKE:
+                    return '#87CEFA'; // Light sky blue for ice
+                case PLATFORM_TYPES.CLOUD:
+                    return '#FFFFFF'; // White for cloud
+                case PLATFORM_TYPES.MOVING:
+                    return '#FF9800'; // Orange for moving platform
+                default:
+                    return '#c84c0c'; // Default brick color
+            }
+        }
+
+        // Function to update special platform behaviors
+        function updateSpecialPlatforms() {
+            platforms.forEach(platform => {
+                // Update moving platforms
+                if (platform.type === PLATFORM_TYPES.MOVING) {
+                    platform.x += platform.moveSpeed * platform.movingDirection;
+                    
+                    // Change direction when reaching limits
+                    if (platform.x > platform.originalX + platform.width) {
+                        platform.movingDirection = -1;
+                    } else if (platform.x < platform.originalX - platform.width) {
+                        platform.movingDirection = 1;
+                    }
+                }
+                
+                // Update cloud platforms
+                if (platform.type === PLATFORM_TYPES.CLOUD && platform.cloudFading) {
+                    platform.cloudOpacity -= 0.02;
+                    
+                    // Remove platform when fully transparent
+                    if (platform.cloudOpacity <= 0) {
+                        platform.cloudOpacity = 0;
+                        // Mark for removal in next filter cycle
+                        platform.y = player.y + 1000; 
+                    }
+                }
             });
         }
 
@@ -408,35 +788,7 @@ Image hosting: Imgbb
             ctx.restore();
         }
 
-        function drawPlatforms() {
-            platforms.forEach(platform => {
-                ctx.fillStyle = platform.color;
-                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
-                
-                // Draw platform edges
-                ctx.strokeStyle = '#606060';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
-            });
-        }
-
-        // Update draw function
-        function draw() {
-            // Clear canvas with black background
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Create brick pattern
-            const brickPattern = createBrickPattern();
-            
-            // Update camera to follow player
-            const targetCameraY = -(player.y - canvas.height * 0.6);
-            cameraOffset.y += (targetCameraY - cameraOffset.y) * 0.1;
-
-            ctx.save();
-            ctx.translate(0, cameraOffset.y);
-            
-            // Draw platforms
+        function drawPlatforms(ctx) {
             platforms.forEach(platform => {
                 if (platform.y + cameraOffset.y > -PLATFORM_HEIGHT && 
                     platform.y + cameraOffset.y < canvas.height) {
@@ -481,17 +833,115 @@ Image hosting: Imgbb
                         ctx.fillStyle = shadowGradient;
                         ctx.fillRect(platform.x, platform.y, platform.width, 10);
                     } else {
-                        // Regular platform drawing (brick pattern)
-                        ctx.fillStyle = brickPattern;
-                        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                        // Draw special platforms based on type
+                        switch (platform.type) {
+                            case PLATFORM_TYPES.ICE_SPIKE:
+                                // Draw ice platform
+                                ctx.fillStyle = platform.color;
+                                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                                
+                                // Add ice texture
+                                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                                for (let i = 0; i < platform.width; i += 15) {
+                                    ctx.fillRect(platform.x + i, platform.y, 5, platform.height);
+                                }
+                                
+                                // Draw spike
+                                ctx.fillStyle = '#FFFFFF'; // White spike
+                                ctx.beginPath();
+                                
+                                if (platform.spikePosition === 'left') {
+                                    // Draw spike on left edge
+                                    ctx.moveTo(platform.x, platform.y);
+                                    ctx.lineTo(platform.x, platform.y - platform.spikeHeight);
+                                    ctx.lineTo(platform.x + 20, platform.y);
+                                } else {
+                                    // Draw spike on right edge
+                                    ctx.moveTo(platform.x + platform.width, platform.y);
+                                    ctx.lineTo(platform.x + platform.width, platform.y - platform.spikeHeight);
+                                    ctx.lineTo(platform.x + platform.width - 20, platform.y);
+                                }
+                                
+                                ctx.closePath();
+                                ctx.fill();
+                                
+                                // Add platform border
+                                ctx.strokeStyle = '#4682B4'; // Steel blue border
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                                break;
+                                
+                            case PLATFORM_TYPES.CLOUD:
+                                // Set opacity for fading effect
+                                ctx.globalAlpha = platform.cloudOpacity;
+                                
+                                // Draw cloud platform
+                                // Base rectangle
+                                ctx.fillStyle = platform.color;
+                                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                                
+                                // Cloud bumps on top
+                                const bumpCount = Math.floor(platform.width / 40);
+                                const bumpWidth = platform.width / bumpCount;
+                                
+                                for (let i = 0; i < bumpCount; i++) {
+                                    ctx.beginPath();
+                                    ctx.arc(
+                                        platform.x + (i * bumpWidth) + (bumpWidth / 2),
+                                        platform.y,
+                                        bumpWidth / 2,
+                                        0, Math.PI, true
+                                    );
+                                    ctx.fill();
+                                }
+                                
+                                // Reset opacity
+                                ctx.globalAlpha = 1;
+                                break;
+                                
+                            case PLATFORM_TYPES.MOVING:
+                                // Draw moving platform
+                                ctx.fillStyle = platform.color;
+                                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                                
+                                // Add direction indicator arrows
+                                ctx.fillStyle = '#FFFFFF';
+                                
+                                // Left arrow
+                                ctx.beginPath();
+                                ctx.moveTo(platform.x + 20, platform.y + platform.height / 2);
+                                ctx.lineTo(platform.x + 40, platform.y + platform.height / 4);
+                                ctx.lineTo(platform.x + 40, platform.y + platform.height * 3/4);
+                                ctx.closePath();
+                                ctx.fill();
+                                
+                                // Right arrow
+                                ctx.beginPath();
+                                ctx.moveTo(platform.x + platform.width - 20, platform.y + platform.height / 2);
+                                ctx.lineTo(platform.x + platform.width - 40, platform.y + platform.height / 4);
+                                ctx.lineTo(platform.x + platform.width - 40, platform.y + platform.height * 3/4);
+                                ctx.closePath();
+                                ctx.fill();
+                                
+                                // Add platform border
+                                ctx.strokeStyle = '#CC7000';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                                break;
+                                
+                            default:
+                                // Regular platform drawing (brick pattern)
+                                const brickPattern = createBrickPattern();
+                                ctx.fillStyle = brickPattern;
+                                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                                
+                                ctx.strokeStyle = '#8b0000';
+                                ctx.lineWidth = 4;
+                                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                                break;
+                        }
                         
-                        ctx.strokeStyle = '#8b0000';
-                        ctx.lineWidth = 4;
-                        ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
-                    }
-                    
-                    // Draw platform number (only for non-floor platforms)
-                    if (!platform.isFloor) {
+                        // Draw platform number (only for non-floor platforms)
                         ctx.fillStyle = 'white';
                         ctx.font = 'bold 30px Arial';
                         ctx.textAlign = 'center';
@@ -507,6 +957,28 @@ Image hosting: Imgbb
                             platform.y + platform.height / 2 + 10);
                     }
                 }
+            });
+        }
+
+        // Update draw function
+        function draw() {
+            // Clear canvas with black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update camera to follow player
+            const targetCameraY = -(player.y - canvas.height * 0.6);
+            cameraOffset.y += (targetCameraY - cameraOffset.y) * 0.1;
+
+            ctx.save();
+            ctx.translate(0, cameraOffset.y);
+            
+            // Draw platforms using the new function
+            drawPlatforms(ctx);
+            
+            // Draw coins
+            coins.forEach(coin => {
+                coin.draw(ctx);
             });
 
             drawPlayer();
@@ -575,6 +1047,14 @@ Image hosting: Imgbb
             if (!isOnPlatform && player.onGround) {
                 player.onGround = false;
             }
+
+            // Coin collision detection and collection
+            coins.forEach(coin => {
+                if (!coin.collectionAnimation && checkCoinCollision(coin)) {
+                    coin.collect();
+                }
+                coin.update();
+            });
 
             // Game over check - adjust for new platform management
             const lowestPlatform = platforms.reduce((prev, current) => 
@@ -700,6 +1180,8 @@ Image hosting: Imgbb
         function resetGame() {
             baseHeight = 0;
             platforms = [];
+            coins = []; // Reset coins array
+            coinsCollected = 0; // Reset coins collected counter
             
             // Create the concrete floor platform first
             const floorPlatform = {
@@ -717,7 +1199,7 @@ Image hosting: Imgbb
             // Create regular platforms starting higher up
             for (let i = 1; i < 20; i++) {
                 const platformY = canvas.height - FLOOR_HEIGHT - (i * 300);
-                platforms.push({
+                const newPlatform = {
                     x: Math.random() * (canvas.width - getRandomPlatformWidth()),
                     y: platformY,
                     width: getRandomPlatformWidth(),
@@ -726,7 +1208,12 @@ Image hosting: Imgbb
                     number: i,
                     visited: false,
                     isFloor: false
-                });
+                };
+                
+                platforms.push(newPlatform);
+                
+                // Place coins on the new platform
+                placeCoinOnPlatform(newPlatform);
             }
 
             // Set base height to the floor platform
@@ -814,10 +1301,36 @@ Image hosting: Imgbb
         }
 
         function checkPlatformCollision(platform) {
-            return player.y + player.height > platform.y &&
-                   player.y < platform.y + platform.height &&
-                   player.x + player.width > platform.x &&
-                   player.x < platform.x + platform.width;
+            // Basic collision detection
+            const collision = player.y + player.height > platform.y &&
+                             player.y < platform.y + platform.height &&
+                             player.x + player.width > platform.x &&
+                             player.x < platform.x + platform.width;
+            
+            if (collision) {
+                // Handle special platform behaviors on collision
+                if (platform.type === PLATFORM_TYPES.CLOUD && !platform.cloudFading) {
+                    platform.cloudFading = true; // Start fading the cloud platform
+                }
+                
+                // Check for spike collision
+                if (platform.type === PLATFORM_TYPES.ICE_SPIKE) {
+                    const spikeX = platform.spikePosition === 'left' ? platform.x : platform.x + platform.width - 20;
+                    const spikeCollision = player.y + player.height > platform.y - platform.spikeHeight &&
+                                          player.y < platform.y &&
+                                          player.x + player.width > spikeX &&
+                                          player.x < spikeX + 5;
+                    
+                    if (spikeCollision) {
+                        // Player hit a spike - implement damage or game over
+                        gameStarted = false;
+                        showGameOverScreen();
+                        return false;
+                    }
+                }
+            }
+            
+            return collision;
         }
 
         // Add level completion check
@@ -906,7 +1419,7 @@ Image hosting: Imgbb
             
             // Set the player name and score
             document.getElementById('finalPlayerName').textContent = `Player: ${playerName}`;
-            document.getElementById('finalScore').textContent = `Final Height: ${score}m`;
+            document.getElementById('finalScore').textContent = `Final Height: ${score}m | Coins: ${coinsCollected}`;
             
             // Draw the player's avatar on the game over screen
             const avatarCanvas = document.getElementById('gameOverAvatar');
@@ -936,7 +1449,16 @@ Image hosting: Imgbb
             <p style="font-size: 36px; color: green;">Height: <span style="font-size: 36px; color: green;">${score}</span>m</p>
             <p style="font-size: 24px; color: rgb(245, 41, 235);">Level: <span style="font-size: 24px; color: rgb(245, 23, 245);">${currentLevel}</span></p>
             <p style="font-size: 24px; color: white;">Platforms: <span style="font-size: 24px; color: white;">${platformsClimbed}</span>/${PLATFORMS_PER_LEVEL}</p>
+            <p style="font-size: 24px; color: gold;">Coins: <span style="font-size: 24px; color: gold;">${coinsCollected}</span></p>
             `;
+        }
+
+        // Add this function to check for coin collision
+        function checkCoinCollision(coin) {
+            return player.y + player.height > coin.y &&
+                   player.y < coin.y + coin.height &&
+                   player.x + player.width > coin.x &&
+                   player.x < coin.x + coin.width;
         }
     </script>
 </body>
